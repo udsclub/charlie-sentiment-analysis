@@ -17,16 +17,24 @@ from keras.layers import Conv1D, MaxPooling1D, Embedding, Dropout
 from keras.models import Model
 from keras.models import model_from_json
 from keras.regularizers import l2, activity_l2
+
+from nltk.corpus import stopwords
+from nltk.tag import pos_tag
+from nltk.corpus import words
+from nltk import wordpunct_tokenize as wt
+
+from sklearn.model_selection import train_test_split
+
 import six.moves.cPickle
 
 TRAIN_MODE = False
 NB_EPOCH = 2
-BASE_DIR = 'mixed_ds_train'
+BASE_DIR = 'int_8070_8139'  # 'mixed_ds_train'
 MAX_SEQUENCE_LENGTH = 100
 MAX_NB_WORDS = 20000
 EMBEDDING_DIM = 100
 VALIDATION_SPLIT = 0.2
-DATAFILES = ['reviews_rt_all.csv','imdb_small.csv']   # dataset for verification should be here
+DATAFILES = ['reviews_rt_all.csv', 'imdb_small.csv']   # dataset for verification should be here
 TOKENIZER = "cnn_tokenizer"
 
 # second, prepare text samples and their labels
@@ -36,16 +44,49 @@ texts = []  # list of text samples
 labels_index = {'negative': 0, 'positive': 1}  # dictionary mapping label name to numeric id
 labels = []  # list of label ids
 
+cached_stopwords = stopwords.words("english")
+en_words = set(words.words())
+
+
+def remove_stopwords(text):
+    return ' '.join([word for word in text.split() if word not in cached_stopwords])
+
+
+def remove_names(text):
+    tagged_sent = pos_tag(text.split())
+    return ' '.join([word for word, pos in tagged_sent if pos != 'NNP'])
+
+
+def remove_non_english(text):
+    return ' '.join(w for w in wt(text) if w.lower() in en_words or not w.isalpha())
+
+
+def basic_preprocessing(samples):
+    for line in samples:
+        data_columns = line.split('|')
+        lbl = data_columns[0]
+        txt = data_columns[1]
+        # txt = remove_non_english(txt)
+        # txt = remove_names(txt)
+        txt = txt.lower()
+        txt = remove_stopwords(txt)
+        txt = re.sub("[^a-z-_.\s]", u'', txt)
+        txt = re.sub(r"\b[a-z]{1}\b", ' ', txt)
+        txt = re.sub('\.{1,10}', ' ', txt)
+        # txt = txt.replace('<br />', ' ')
+        if lbl.isdigit() and txt:
+            labels.append(lbl)
+            texts.append(txt)
+
+
 for df in DATAFILES:
     with open(df) as text_samples:
-        for line in text_samples:
-            tvalues = line.split('|')
-            lbl = tvalues[0]
-            txt = tvalues[1].lower()
-            txt = re.sub("[^a-z-_.\s]", u'', txt)
-            if lbl.isdigit() and txt:
-                labels.append(lbl)
-                texts.append(txt)
+        basic_preprocessing(text_samples)
+
+# with open("processed_data.csv", 'a') as pr_data:
+#     for i in range(0, len(labels)):
+#         conc_line = labels[i] + '|' + texts[i] + '\n'
+#         pr_data.write(conc_line)
 
 print('Found %s texts.' % len(texts))
 
@@ -68,7 +109,6 @@ print('Shape of data tensor:', data.shape)
 # print(data[:1])
 print('Shape of label tensor:', labels.shape)
 
-from sklearn.model_selection import train_test_split
 x_train, x_val, y_train, y_val = train_test_split(data, labels,
                                                   test_size=VALIDATION_SPLIT,
                                                   random_state=42, stratify=labels)
