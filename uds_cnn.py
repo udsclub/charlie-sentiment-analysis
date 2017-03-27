@@ -20,7 +20,7 @@ from keras.layers import Dense, Input, Flatten
 from keras.layers import Conv1D, MaxPooling1D, Embedding, Dropout, GlobalAveragePooling1D
 from keras.models import Model, Sequential, model_from_json
 from keras.regularizers import l2, activity_l2
-from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, CSVLogger
+from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, CSVLogger, TensorBoard
 from keras import backend as K
 
 from nltk.corpus import stopwords
@@ -194,12 +194,15 @@ def create_seq_model(layer):
 
 
 def train_model(coefficient_of_asymmetry):
+    suffix = str(datetime.datetime.now().isoformat())
+    tensorboard_cb = TensorBoard(log_dir='./logs/logs_{}'.format(suffix), histogram_freq=0,
+                                 write_graph=False, write_images=False)
     stopper_cb = EarlyStopping(monitor='val_acc', min_delta=0, patience=4, verbose=1, mode='auto')
-    checkpoint_cb = ModelCheckpoint("./checkpoint/weights.{epoch:02d}-{val_acc:.4f}-{val_loss:.4f}.h5",
+    checkpoint_cb = ModelCheckpoint("./checkpoint/weights_amazon_cnn.h5",
                                     monitor='val_loss', save_best_only=True, verbose=0)
     slower_cb = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=2, verbose=1,
                                   mode='auto', epsilon=0.0001, cooldown=0, min_lr=0)
-    csv_logger = CSVLogger("./logs/training_{}.log".format(str(datetime.datetime.now().isoformat())))
+    csv_logger = CSVLogger("./logs/training_{}.log".format(suffix))
     ts1 = datetime.datetime.now()
     df = load_data(coefficient_of_asymmetry)
     ts2 = datetime.datetime.now()
@@ -214,7 +217,7 @@ def train_model(coefficient_of_asymmetry):
     tokenizer.fit_on_texts(df["new_text"])
     six.moves.cPickle.dump(tokenizer, 
         open("./tokenizers/{}_{}_{}".format(TOKENIZER, coefficient_of_asymmetry,
-                                            str(datetime.datetime.now().isoformat())), "wb"))
+                                            str(suffix)), "wb"))
     word_index = tokenizer.word_index
     ts2 = datetime.datetime.now()
     print('tokenization:', ts2 - ts1)
@@ -247,7 +250,7 @@ def train_model(coefficient_of_asymmetry):
     model.fit(x_train, y_train,
               validation_data=(x_val, y_val), verbose=1,
               nb_epoch=NB_EPOCH, batch_size=128, shuffle=True,
-              callbacks=[stopper_cb, checkpoint_cb, slower_cb, csv_logger])
+              callbacks=[stopper_cb, checkpoint_cb, slower_cb, csv_logger, tensorboard_cb])
     ts1 = datetime.datetime.now()
     print('model creation and fitting:', ts1 - ts2)
     print("Save model to disk")
