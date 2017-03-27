@@ -194,7 +194,7 @@ def create_seq_model(layer):
 
 
 def train_model(coefficient_of_asymmetry):
-    suffix = str(datetime.datetime.now().isoformat())
+    suffix = str(datetime.datetime.now().isoformat()) + '_' + str(coefficient_of_asymmetry)
     tensorboard_cb = TensorBoard(log_dir='./logs/logs_{}'.format(suffix), histogram_freq=0,
                                  write_graph=False, write_images=False)
     stopper_cb = EarlyStopping(monitor='val_acc', min_delta=0, patience=4, verbose=1, mode='auto')
@@ -215,9 +215,7 @@ def train_model(coefficient_of_asymmetry):
 
     tokenizer = Tokenizer(nb_words=MAX_NB_WORDS)
     tokenizer.fit_on_texts(df["new_text"])
-    six.moves.cPickle.dump(tokenizer, 
-        open("./tokenizers/{}_{}_{}".format(TOKENIZER, coefficient_of_asymmetry,
-                                            str(suffix)), "wb"))
+    six.moves.cPickle.dump(tokenizer, open("./tokenizers/{}_{}".format(TOKENIZER, suffix), "wb"))
     word_index = tokenizer.word_index
     ts2 = datetime.datetime.now()
     print('tokenization:', ts2 - ts1)
